@@ -80,7 +80,7 @@ DATABASES = {
         'NAME': 'blog_first',
         'USER': 'root',
         'PASSWORD': 'narata',
-        'HOST': '219.216.65.127',
+        'HOST': 'localhost',
     }
 }
 
