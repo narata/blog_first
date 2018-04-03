@@ -1,4 +1,4 @@
-from .models import Post, Category
+from .models import Post, Category, Tag
 import markdown
 from django.shortcuts import render, get_object_or_404
 from comments.forms import CommentForm
@@ -14,6 +14,103 @@ class IndexView(ListView):
     model = Post
     template_name = 'blog/index.html'
     context_object_name = 'post_list'
+    paginate_by = 2
+
+    def get_context_data(self, **kwargs):
+
+        # 首先获得父类生成的传递给模板的字典。
+        context = super().get_context_data(**kwargs)
+
+        # 父类生成的字典中已有 paginator、page_obj、is_paginated 这三个模板变量
+        paginator = context.get('paginator')
+        page = context.get('page_obj')
+        is_paginated = context.get('is_paginated')
+
+        # 调用自己写的 pagination_data 方法获得显示分页导航条需要的数据，见下方。
+        pagination_data = self.pagination_data(paginator, page, is_paginated)
+
+        # 将分页导航条的模板变量更新到 context 中
+        context.update(pagination_data)
+
+        return context
+
+    def pagination_data(self, paginator, page, is_paginated):
+        if not is_paginated:
+            return {}
+
+        # 当前页左边连续的页码号，初始值为空
+        left = []
+
+        # 当前页右边连续的页码号，初始值为空
+        right = []
+
+        # 标示第 1 页页码后是否需要显示省略号
+        left_has_more = False
+
+        # 标示最后一页页码前是否需要显示省略号
+        right_has_more = False
+
+        # 标示是否需要显示第 1 页的页码号。
+        first = False
+
+        # 标示是否需要显示最后一页的页码号。
+        last = False
+
+        # 获得用户当前请求的页码号
+        page_number = page.number
+
+        # 获得分页后的总页数
+        total_pages = paginator.num_pages
+
+        # 获得整个分页页码列表，比如分了四页，那么就是 [1, 2, 3, 4]
+        page_range = paginator.page_range
+
+        if page_number == 1:
+            right = page_range[page_number:page_number + 2]
+
+            # 显示省略号
+            if right[-1] < total_pages - 1:
+                right_has_more = True
+
+            # 显示最后一页的页码号
+            if right[-1] < total_pages:
+                last = True
+
+        elif page_number == total_pages:
+            left = page_range[(page_number - 3) if (page_number - 3) > 0 else 0:page_number - 1]
+
+            if left[0] > 2:
+                left_has_more = True
+
+            if left[0] > 1:
+                first = True
+        else:
+            # 用户请求的既不是最后一页，也不是第 1 页
+            left = page_range[(page_number - 3) if (page_number - 3) > 0 else 0:page_number - 1]
+            right = page_range[page_number:page_number + 2]
+
+            # 是否需要显示最后一页和最后一页前的省略号
+            if right[-1] < total_pages - 1:
+                right_has_more = True
+            if right[-1] < total_pages:
+                last = True
+
+            # 是否需要显示第 1 页和第 1 页后的省略号
+            if left[0] > 2:
+                left_has_more = True
+            if left[0] > 1:
+                first = True
+
+        data = {
+            'left': left,
+            'right': right,
+            'left_has_more': left_has_more,
+            'right_has_more': right_has_more,
+            'first': first,
+            'last': last,
+        }
+
+        return data
 
 
 # def detail(request, pk):
@@ -91,8 +188,6 @@ class ArchivesView(IndexView):
         return super(ArchivesView, self).get_queryset().filter(
             created_time__year=self.kwargs.get('year'), created_time__month=self.kwargs.get('month'))
 
-
-
 # def category(request, pk):
 #     # 记得在开始部分导入 Category 类
 #     cate = get_object_or_404(Category, pk=pk)
@@ -104,3 +199,9 @@ class CategoryView(IndexView):
     def get_queryset(self):
         cate = get_object_or_404(Category, pk=self.kwargs.get('pk'))
         return super(CategoryView, self).get_queryset().filter(category=cate)
+
+
+class TagView(IndexView):
+    def get_queryset(self):
+        tag = get_object_or_404(Tag, pk=self.kwargs.get('pk'))
+        return super(TagView, self).get_queryset().filter(tags=tag)
