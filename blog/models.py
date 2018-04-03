@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.urls import reverse
+import markdown
+from django.utils.html import strip_tags
 
 
 class Category(models.Model):
@@ -43,8 +45,24 @@ class Post(models.Model):
     # 规定一篇文章只能有一个作者，而一个作者可能会写多篇文章，因此这是一对多的关联关系。
     author = models.ForeignKey(User)
 
+    # 新增 views 字段记录阅读量
+    views = models.PositiveIntegerField(default=0)
+
     def get_absolute_url(self):
         return reverse('blog:detail', kwargs={'pk': self.pk})
+
+    def increase_views(self):
+        self.views += 1
+        self.save(update_fields=['views'])
+
+    def save(self, *args, **kwargs):
+        if not self.excerpt:
+            md = markdown.Markdown(extensions=[
+                'markdown.extensions.extra',
+                'markdown.extensions.codehilite',
+            ])
+            self.excerpt = strip_tags(md.convert(self.body))[:54]
+        super(Post, self).save(*args, **kwargs)
 
     def __str__(self):
         return self.title
